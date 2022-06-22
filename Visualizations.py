@@ -21,5 +21,5 @@ def plot_price_over_time(uuid):
     plt.ylabel('Price (USD)')
     plt.show()
 
-plot_price_over_time("'fdccaf49-4190-5740-bf6c-2fc9139489f8'")
-plot_price_over_time("'b0a94e61-889f-5265-8a18-ca1271694239'")
+# plot_price_over_time("'fdccaf49-4190-5740-bf6c-2fc9139489f8'")
+# plot_price_over_time("'b0a94e61-889f-5265-8a18-ca1271694239'")
