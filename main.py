@@ -1,6 +1,10 @@
 import json
 import sqlite3
 import statistics
+import os
+
+# The benefit of using a sql database is that it can be expanded pretty easily if there is new data
+# TODO: I could set this script to run every month or so to extend the Prices table
 
 # This script uses the oracle cards json file supplied by Scryfall.com and the price history supplied by mtgjson.com
 # to create a sqlite database which contains card data and price data
@@ -62,7 +66,7 @@ def init_oraclecard_db(connection):
 # Creates a sqlite table named AllPrintings for oracle cards using a preestablished connection to some db
 def add_all_printings(connection):
 
-    all_printings_path = 'c:\Datasets\AllPrintings.sqlite'
+    all_printings_path = "'c:\Datasets\AllPrintings.sqlite'"
     connection.execute("ATTACH DATABASE "+all_printings_path+" AS TempAP")
     connection.execute("CREATE TABLE allprintings AS SELECT * FROM TempAP.c")
 
@@ -70,6 +74,9 @@ def add_all_printings(connection):
 
 # For each row in the Cards table, find its price history and insert into the Price table
 def init_price_db(connection):
+    prices = open("C://Datasets//AllPrices.json", encoding='utf8')
+    json_prices = json.load(prices)['data']
+
     # 2 cursors since we r/w to the same db
     readcur = connection.cursor()
     writecur = connection.cursor()
@@ -77,16 +84,18 @@ def init_price_db(connection):
     # This database needs a lot of columns
     try:
         writecur.execute("CREATE TABLE Prices (name TEXT, uuid TEXT, scryfall_id TEXT)")
-        for i in range(93):
-            writecur.execute("ALTER TABLE Prices ADD Day_" + str(i) + " FLOAT;")
         writecur.execute("ALTER TABLE Prices ADD Median_Price FLOAT;")
         writecur.execute("ALTER TABLE Prices ADD Mean_Price FLOAT;")
         writecur.execute("ALTER TABLE Prices ADD Percent_Change FLOAT;")
+
+        # Returns a dictionary where dates map to prices
+        vorstclaw = json_prices['4dc8ad93-2ba1-5417-b4c6-77f93293c1b3']['paper']['tcgplayer']['retail']['normal']
+        dates = list(vorstclaw.keys())
+
+        for d in dates:
+            writecur.execute("ALTER TABLE Prices ADD '" + d + "' FLOAT;")
     except:
         pass
-
-    prices = open("C://Datasets//AllPrices.json", encoding='utf8')
-    json_prices = json.load(prices)['data']
 
     readcur.execute('SELECT * FROM Master')
     for card_row in readcur:
@@ -111,7 +120,7 @@ def init_price_db(connection):
             if len(all_dates) != 93:
                 all_dates = ['NULL'] * (93 - len(all_dates)) + all_dates
 
-            insertrow = [name, target_id, scryfall_id] + all_dates + [median_price, mean_price, percent_change]
+            insertrow = [name, target_id, scryfall_id, median_price, mean_price, percent_change] + all_dates
             string = str(insertrow)[1:-1]
 
             writecur.execute("INSERT INTO Prices VALUES (" + string + ");")
@@ -120,18 +129,20 @@ def init_price_db(connection):
             pass
     connection.commit()
 
+def build_new_DB():
+    if os.path.exists('mtgfinance.sqlite'):
+        os.remove('mtgfinance.sqlite')
+    con = sqlite3.connect('mtgfinance.sqlite')
+    print("Grabbing Card Data...")
+    add_all_printings(con)
+    print("Done")
+    print("Joining Tables...")
+    init_oraclecard_db(con)
+    print("Done")
+    print("Grabbing Prices...")
+    init_price_db(con)
+    print("Done")
 
-con = sqlite3.connect('mtgfinance.sqlite')
-cur = con.cursor()
+    con.close()
 
-print("Grabbing Card Data...")
-add_all_printings(con)
-print("Done")
-print("Joining Tables...")
-init_oraclecard_db(con)
-print("Done")
-print("Grabbing Prices...")
-init_price_db(con)
-print("Done")
-
-con.close()
+build_new_DB()
